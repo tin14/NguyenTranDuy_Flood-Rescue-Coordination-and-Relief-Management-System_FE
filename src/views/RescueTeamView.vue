@@ -17,10 +17,11 @@
               {{ myTeam?.status === 'available' ? '✅ Sẵn sàng' : '🔄 Đang thực hiện nhiệm vụ' }}
             </span>
           </span>
-          <!-- Hiện danh sách phương tiện nếu có — join bằng dấu phẩy -->
-          <span v-if="myTeam?.vehicles?.length" class="ms-3">
-            <i class="bi bi-truck me-1"></i>{{ myTeam.vehicles.join(', ') }}
+          <!-- Phương tiện được Coordinator gán cho đội này -->
+          <span v-if="myVehicles.length" class="ms-3">
+            <i class="bi bi-truck me-1"></i>{{ myVehicles.join(', ') }}
           </span>
+          <span v-else class="ms-3 text-muted small fst-italic">Chưa có phương tiện được gán</span>
         </div>
       </div>
 
@@ -230,6 +231,13 @@ const completeNote = ref('')
 // Lấy thông tin đội của người dùng hiện tại từ store.teams
 // Dựa trên quy ước: teams[].id === users[].id
 const myTeam = computed(() => store.teams.find(t => t.id === store.currentUser?.id))
+
+// Lấy danh sách phương tiện đang được gán cho đội này từ kho phương tiện
+const myVehicles = computed(() =>
+  store.vehicles
+    ? store.vehicles.filter(v => v.assignedTeamId === store.currentUser?.id).map(v => v.name)
+    : []
+)
 
 // Lọc nhiệm vụ đang active (chưa hoàn thành) được phân công cho đội này
 // Sắp xếp theo độ ưu tiên: critical(0) > high(1) > medium(2) > low(3)

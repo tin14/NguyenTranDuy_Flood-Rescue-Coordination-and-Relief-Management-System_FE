@@ -100,7 +100,7 @@ function defaultState() {
       // minStock:    ngưỡng tồn tối thiểu — nếu quantity <= minStock thì hiện cảnh báo
     ],
 
-    // Lịch sử các lần phân phối hàng cứu trợ
+    // Lịch sử các lần phân phối hàng cứu trợ (dùng bởi Manager)
     distributions: [
       { id: 1, itemId: 1, itemName: 'Gạo (kg)',         quantity: 500, location: 'Phường 3, TP. Cần Thơ', date: '2024-10-14', note: 'Phát cho 50 hộ' },
       { id: 2, itemId: 2, itemName: 'Nước uống (chai)', quantity: 300, location: 'Huyện Vĩnh Thạnh',      date: '2024-10-14', note: 'Phát cho 30 hộ' },
@@ -110,11 +110,30 @@ function defaultState() {
 
     // Thông tin các đội cứu hộ
     teams: [
-      { id: 3, name: 'Đội Cứu Hộ A', memberCount: 8, vehicles: ['Xuồng máy', 'Xe tải'], status: 'busy',      currentTask: 1    },
-      { id: 4, name: 'Đội Cứu Hộ B', memberCount: 6, vehicles: ['Xuồng máy'],            status: 'available', currentTask: null },
+      { id: 3, name: 'Đội Cứu Hộ A', memberCount: 8, status: 'busy',      currentTask: 1    },
+      { id: 4, name: 'Đội Cứu Hộ B', memberCount: 6, status: 'available', currentTask: null },
       // QUAN TRỌNG: id của team phải trùng với id của user tương ứng trong mảng users
       // status: 'available' = sẵn sàng nhận nhiệm vụ, 'busy' = đang bận
       // currentTask: ID của yêu cầu cứu hộ đang thực hiện, null nếu rảnh
+    ],
+
+    // Kho phương tiện — Coordinator điều phối gán cho các đội cứu hộ
+    vehicles: [
+      { id: 1, name: 'Xuồng máy 01', type: 'Xuồng máy',  status: 'assigned',  assignedTeamId: 3, assignedTeamName: 'Đội Cứu Hộ A' },
+      { id: 2, name: 'Xe tải 01',    type: 'Xe tải',     status: 'assigned',  assignedTeamId: 3, assignedTeamName: 'Đội Cứu Hộ A' },
+      { id: 3, name: 'Xuồng máy 02', type: 'Xuồng máy',  status: 'assigned',  assignedTeamId: 4, assignedTeamName: 'Đội Cứu Hộ B' },
+      { id: 4, name: 'Xuồng máy 03', type: 'Xuồng máy',  status: 'available', assignedTeamId: null, assignedTeamName: null },
+      { id: 5, name: 'Xe tải 02',    type: 'Xe tải',     status: 'available', assignedTeamId: null, assignedTeamName: null },
+      { id: 6, name: 'Trực thăng 01',type: 'Trực thăng', status: 'available', assignedTeamId: null, assignedTeamName: null },
+      // status: 'available' = sẵn sàng | 'assigned' = đang gán cho đội
+    ],
+
+    // Phiếu phân phối hàng cứu trợ cho đội — do Coordinator thực hiện
+    // vehicleId/vehicleName: phương tiện được chọn để vận chuyển (null = chưa chỉ định)
+    supplyOrders: [
+      { id: 1, itemId: 1, itemName: 'Gạo (kg)',         quantity: 500, teamId: 3, teamName: 'Đội Cứu Hộ A', vehicleId: 1, vehicleName: 'Xuồng máy 01', date: '2024-10-14', note: 'Phát cho 50 hộ tại Phường 3' },
+      { id: 2, itemId: 2, itemName: 'Nước uống (chai)', quantity: 300, teamId: 4, teamName: 'Đội Cứu Hộ B', vehicleId: 3, vehicleName: 'Xuồng máy 02', date: '2024-10-14', note: 'Phát cho 30 hộ tại Huyện Vĩnh Thạnh' },
+      { id: 3, itemId: 1, itemName: 'Gạo (kg)',         quantity: 700, teamId: 3, teamName: 'Đội Cứu Hộ A', vehicleId: 2, vehicleName: 'Xe tải 01',    date: '2024-10-15', note: 'Phát cho 70 hộ tại Phường 7' },
     ],
 
     // Bộ đếm ID tự tăng — đảm bảo mỗi record mới có ID duy nhất
@@ -122,15 +141,28 @@ function defaultState() {
       user:         8, // ID tiếp theo khi thêm người dùng mới
       request:      4, // ID tiếp theo khi tạo yêu cầu cứu hộ mới
       inventory:    7, // ID tiếp theo khi thêm mặt hàng mới vào kho
-      distribution: 4, // ID tiếp theo khi ghi nhận phân phối mới
+      distribution: 4, // ID tiếp theo khi ghi nhận phân phối (Manager)
+      vehicle:      7, // ID tiếp theo khi thêm phương tiện mới
+      supplyOrder:  4, // ID tiếp theo khi Coordinator tạo phiếu phân phối
     }
   }
 }
 
 // Đọc state đã lưu từ localStorage; nếu chưa có thì dùng dữ liệu mặc định
-const saved = loadState()
+function initState() {
+  const saved = loadState()
+  if (!saved) return defaultState()
+  // Đảm bảo các trường mới (vehicles, supplyOrders) tồn tại nếu dữ liệu cũ chưa có
+  const def = defaultState()
+  if (!saved.vehicles)     saved.vehicles     = def.vehicles
+  if (!saved.supplyOrders) saved.supplyOrders = def.supplyOrders
+  if (!saved.nextId.vehicle)     saved.nextId.vehicle     = def.nextId.vehicle
+  if (!saved.nextId.supplyOrder) saved.nextId.supplyOrder = def.nextId.supplyOrder
+  return saved
+}
+
 // reactive() bọc object lại để Vue có thể theo dõi thay đổi và tự động cập nhật UI
-export const store = reactive(saved || defaultState())
+export const store = reactive(initState())
 
 // ─── Hàm lưu state vào localStorage ────────────────────────────────────────
 // Gọi sau mỗi thao tác thay đổi dữ liệu để đảm bảo không mất khi reload trang
@@ -233,19 +265,18 @@ export function updateInventoryItem(id, updates) {
   }
 }
 
-// ─── Ghi nhận phân phối hàng cứu trợ ────────────────────────────────────────
+// ─── Ghi nhận phân phối hàng cứu trợ (Manager) ──────────────────────────────
 // dist: { itemId, itemName, quantity, location, note }
-// Tự động trừ số lượng trong kho và cộng số lượng đã phát
 export function addDistribution(dist) {
   const id = store.nextId.distribution++
-  const item = store.inventory.find(i => i.id === dist.itemId) // Tìm mặt hàng trong kho
+  const item = store.inventory.find(i => i.id === dist.itemId)
   if (item) {
-    item.quantity -= dist.quantity     // Trừ số lượng vừa phát ra khỏi kho
-    item.distributed += dist.quantity  // Cộng vào tổng đã phát (để thống kê)
+    item.quantity -= dist.quantity
+    item.distributed += dist.quantity
     store.distributions.push({
       ...dist,
       id,
-      date: new Date().toISOString().slice(0, 10), // Chỉ lấy phần ngày "YYYY-MM-DD"
+      date: new Date().toISOString().slice(0, 10),
     })
     saveState()
   }
@@ -265,6 +296,54 @@ export function updateUser(id, updates) {
   const user = store.users.find(u => u.id === id)
   if (user) {
     Object.assign(user, updates)
+    saveState()
+  }
+}
+
+// ─── Thêm phương tiện mới vào kho ───────────────────────────────────────────
+// vehicle: { name, type }
+export function addVehicle(vehicle) {
+  const id = store.nextId.vehicle++
+  store.vehicles.push({ ...vehicle, id, status: 'available', assignedTeamId: null, assignedTeamName: null })
+  saveState()
+}
+
+// ─── Gán phương tiện cho đội cứu hộ (Coordinator) ───────────────────────────
+export function assignVehicle(vehicleId, teamId, teamName) {
+  const vehicle = store.vehicles.find(v => v.id === vehicleId)
+  if (vehicle) {
+    vehicle.status = 'assigned'
+    vehicle.assignedTeamId = teamId
+    vehicle.assignedTeamName = teamName
+    saveState()
+  }
+}
+
+// ─── Thu hồi phương tiện về kho (Coordinator) ───────────────────────────────
+export function unassignVehicle(vehicleId) {
+  const vehicle = store.vehicles.find(v => v.id === vehicleId)
+  if (vehicle) {
+    vehicle.status = 'available'
+    vehicle.assignedTeamId = null
+    vehicle.assignedTeamName = null
+    saveState()
+  }
+}
+
+// ─── Coordinator tạo phiếu phân phối hàng cho đội cứu hộ ────────────────────
+// order: { itemId, itemName, quantity, teamId, teamName, vehicleId, vehicleName, note }
+// Tự động trừ số lượng trong kho và cộng số lượng đã phát
+export function addSupplyOrder(order) {
+  const id = store.nextId.supplyOrder++
+  const item = store.inventory.find(i => i.id === order.itemId)
+  if (item) {
+    item.quantity -= order.quantity
+    item.distributed += order.quantity
+    store.supplyOrders.push({
+      ...order,
+      id,
+      date: new Date().toISOString().slice(0, 10),
+    })
     saveState()
   }
 }
