@@ -4,6 +4,23 @@
 
     <div class="container-fluid py-4 px-4">
 
+      <!-- ═══ Tab navigation ═══════════════════════════════════════════════════ -->
+      <ul class="nav nav-tabs mb-4 border-bottom">
+        <li class="nav-item">
+          <button class="nav-link" :class="{ active: activeTab === 'requests' }" @click="activeTab = 'requests'">
+            <i class="bi bi-list-task me-1"></i>Yêu Cầu Cứu Hộ
+          </button>
+        </li>
+        <li class="nav-item">
+          <button class="nav-link" :class="{ active: activeTab === 'vehicles' }" @click="activeTab = 'vehicles'">
+            <i class="bi bi-truck me-1"></i>Quản Lý Phương Tiện
+          </button>
+        </li>
+      </ul>
+
+      <!-- ═══ TAB 1: YÊU CẦU CỨU HỘ ═══════════════════════════════════════════ -->
+      <div v-if="activeTab === 'requests'">
+
       <!-- ═══ Dashboard: 4 thẻ thống kê tổng quan ══════════════════════════════ -->
       <div class="row g-3 mb-4">
         <!-- v-for render 4 thẻ từ mảng stats (computed bên dưới) -->
@@ -213,6 +230,111 @@
 
         </div>
       </div>
+      
+      </div><!-- End Tab Requests -->
+
+      <!-- ═══ TAB 2: QUẢN LÝ PHƯƠNG TIỆN ═══════════════════════════════════════ -->
+      <div v-if="activeTab === 'vehicles'">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <h5 class="fw-semibold mb-0"><i class="bi bi-truck text-primary me-2"></i>Quản Lý Phương Tiện</h5>
+          <button class="btn btn-primary btn-sm" @click="showAddVehicle = true">
+            <i class="bi bi-plus-circle me-1"></i>Thêm phương tiện
+          </button>
+        </div>
+
+        <!-- Bảng danh sách phương tiện -->
+        <div class="card border-0 shadow-sm">
+          <div class="card-body p-0">
+            <div class="table-responsive">
+              <table class="table table-hover mb-0">
+                <thead class="table-light">
+                  <tr>
+                    <th>#</th>
+                    <th>Tên phương tiện</th>
+                    <th>Loại</th>
+                    <th>Trạng thái</th>
+                    <th>Đội được gán</th>
+                    <th>Thao tác</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="vehicle in store.vehicles" :key="vehicle.id">
+                    <td>{{ vehicle.id }}</td>
+                    <td class="fw-semibold">{{ vehicle.name }}</td>
+                    <td>{{ vehicle.type }}</td>
+                    <td>
+                      <span class="badge" :class="vehicle.status === 'available' ? 'bg-success' : 'bg-warning text-dark'">
+                        {{ vehicle.status === 'available' ? '✅ Sẵn sàng' : '🔄 Đã gán' }}
+                      </span>
+                    </td>
+                    <td>{{ vehicle.assignedTeamName || '—' }}</td>
+                    <td>
+                      <button v-if="vehicle.status === 'available'" class="btn btn-sm btn-outline-primary" @click="selectVehicleToAssign(vehicle)">
+                        <i class="bi bi-arrow-right-circle me-1"></i>Gán cho đội
+                      </button>
+                      <button v-else class="btn btn-sm btn-outline-danger" @click="doUnassignVehicle(vehicle.id)">
+                        <i class="bi bi-x-circle me-1"></i>Thu hồi
+                      </button>
+                    </td>
+                  </tr>
+                  <tr v-if="store.vehicles.length === 0">
+                    <td colspan="6" class="text-center text-muted py-3">Chưa có phương tiện nào</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div><!-- End Tab Vehicles -->
+
+      <!-- ═══ MODAL: THÊM PHƯƠNG TIỆN ═══════════════════════════════════════════ -->
+      <div v-if="showAddVehicle" class="modal-overlay" @click.self="showAddVehicle = false">
+        <div class="card shadow-lg" style="width:420px">
+          <div class="card-header fw-semibold">Thêm Phương Tiện Mới</div>
+          <div class="card-body">
+            <div class="mb-3">
+              <label class="form-label small">Tên phương tiện</label>
+              <input v-model="vehicleForm.name" class="form-control form-control-sm" placeholder="VD: Xuồng máy 04" />
+            </div>
+            <div class="mb-3">
+              <label class="form-label small">Loại phương tiện</label>
+              <select v-model="vehicleForm.type" class="form-select form-select-sm">
+                <option value="Xuồng máy">Xuồng máy</option>
+                <option value="Xe tải">Xe tải</option>
+                <option value="Trực thăng">Trực thăng</option>
+                <option value="Thuyền">Thuyền</option>
+              </select>
+            </div>
+            <div class="d-flex gap-2">
+              <button class="btn btn-primary btn-sm flex-fill" @click="doAddVehicle">Thêm</button>
+              <button class="btn btn-secondary btn-sm" @click="showAddVehicle = false">Hủy</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ MODAL: GÁN PHƯƠNG TIỆN CHO ĐỘI ═══════════════════════════════════ -->
+      <div v-if="showAssignVehicle" class="modal-overlay" @click.self="showAssignVehicle = false">
+        <div class="card shadow-lg" style="width:420px">
+          <div class="card-header fw-semibold">Gán Phương Tiện: {{ selectedVehicle?.name }}</div>
+          <div class="card-body">
+            <div class="mb-3">
+              <label class="form-label small">Chọn đội cứu hộ</label>
+              <select v-model.number="assignVehicleForm.teamId" class="form-select form-select-sm">
+                <option value="">-- Chọn đội --</option>
+                <option v-for="team in store.teams" :key="team.id" :value="team.id">
+                  {{ team.name }} ({{ team.status === 'available' ? '✅ Sẵn sàng' : '🔄 Đang bận' }})
+                </option>
+              </select>
+            </div>
+            <div class="d-flex gap-2">
+              <button class="btn btn-primary btn-sm flex-fill" :disabled="!assignVehicleForm.teamId" @click="doAssignVehicle">Gán</button>
+              <button class="btn btn-secondary btn-sm" @click="showAssignVehicle = false">Hủy</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
     </div>
   </div>
 </template>
@@ -223,9 +345,12 @@ import { ref, computed, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import NavBar from '../components/NavBar.vue'
 import StatusBadge from '../components/StatusBadge.vue'
-import { store, logout, updateRequestStatus, addDistribution } from '../store/index.js'
+import { store, logout, updateRequestStatus, addSupplyOrder, addVehicle, assignVehicle, unassignVehicle } from '../store/index.js'
 
 const router = useRouter()
+
+// Tab đang hiển thị
+const activeTab = ref('requests')
 
 // Yêu cầu đang được chọn để xem chi tiết
 const selectedRequest = ref(null)
@@ -244,6 +369,17 @@ const actionForm = reactive({
 // Form phân phối đồ tiếp tế
 const distForm = reactive({ itemId: '', quantity: 1, vehicle: '', note: '' })
 const distError = ref('')
+
+// Modal flags
+const showAddVehicle = ref(false)
+const showAssignVehicle = ref(false)
+const selectedVehicle = ref(null)
+
+// Form thêm phương tiện
+const vehicleForm = reactive({ name: '', type: 'Xuồng máy' })
+
+// Form gán phương tiện cho đội
+const assignVehicleForm = reactive({ teamId: '' })
 
 // Danh sách phương tiện của đội được phân công cho yêu cầu đang chọn
 const assignedTeamVehicles = computed(() => {
@@ -319,16 +455,19 @@ function doDistribute() {
   if (!item) return
   if (distForm.quantity < 1) { distError.value = 'Số lượng phải lớn hơn 0!'; return }
   if (distForm.quantity > item.quantity) { distError.value = 'Số lượng phát vượt quá tồn kho!'; return }
-  addDistribution({
-    itemId:   distForm.itemId,
-    itemName: item.name,
-    quantity: distForm.quantity,
-    location: selectedRequest.value.location,
-    note:     distForm.note,
-    teamId:   selectedRequest.value.assignedTeamId,
-    teamName: selectedRequest.value.assignedTeamName,
-    vehicle:  distForm.vehicle,
-    requestId: selectedRequest.value.id,
+  
+  // Tìm vehicleId từ tên phương tiện
+  const vehicle = store.vehicles.find(v => v.name === distForm.vehicle)
+  
+  addSupplyOrder({
+    itemId:       distForm.itemId,
+    itemName:     item.name,
+    quantity:     distForm.quantity,
+    teamId:       selectedRequest.value.assignedTeamId,
+    teamName:     selectedRequest.value.assignedTeamName,
+    vehicleId:    vehicle?.id || null,
+    vehicleName:  distForm.vehicle,
+    note:         distForm.note,
   })
   Object.assign(distForm, { itemId: '', quantity: 1, vehicle: '', note: '' })
   distError.value = ''
@@ -342,4 +481,47 @@ function handleLogout() {
 function formatDate(dt) {
   return new Date(dt).toLocaleString('vi-VN')
 }
+
+// ─── Vehicle Management Functions ───────────────────────────────────────────
+function doAddVehicle() {
+  if (!vehicleForm.name) return
+  addVehicle({ name: vehicleForm.name, type: vehicleForm.type })
+  Object.assign(vehicleForm, { name: '', type: 'Xuồng máy' })
+  showAddVehicle.value = false
+}
+
+function selectVehicleToAssign(vehicle) {
+  selectedVehicle.value = vehicle
+  assignVehicleForm.teamId = ''
+  showAssignVehicle.value = true
+}
+
+function doAssignVehicle() {
+  if (!assignVehicleForm.teamId) return
+  const team = store.teams.find(t => t.id === assignVehicleForm.teamId)
+  if (team) {
+    assignVehicle(selectedVehicle.value.id, team.id, team.name)
+    showAssignVehicle.value = false
+    selectedVehicle.value = null
+  }
+}
+
+function doUnassignVehicle(vehicleId) {
+  unassignVehicle(vehicleId)
+}
+
 </script>
+
+
+<style scoped>
+/* Overlay nền tối cho tất cả modal — cố định toàn màn hình, z-index cao */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1050;
+}
+</style>

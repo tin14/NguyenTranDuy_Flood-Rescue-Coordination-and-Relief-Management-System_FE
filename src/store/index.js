@@ -110,11 +110,12 @@ function defaultState() {
 
     // Thông tin các đội cứu hộ
     teams: [
-      { id: 3, name: 'Đội Cứu Hộ A', memberCount: 8, status: 'busy',      currentTask: 1    },
-      { id: 4, name: 'Đội Cứu Hộ B', memberCount: 6, status: 'available', currentTask: null },
+      { id: 3, name: 'Đội Cứu Hộ A', memberCount: 8, status: 'busy',      currentTask: 1,    vehicles: ['Xuồng máy 01', 'Xe tải 01'] },
+      { id: 4, name: 'Đội Cứu Hộ B', memberCount: 6, status: 'available', currentTask: null, vehicles: ['Xuồng máy 02'] },
       // QUAN TRỌNG: id của team phải trùng với id của user tương ứng trong mảng users
       // status: 'available' = sẵn sàng nhận nhiệm vụ, 'busy' = đang bận
       // currentTask: ID của yêu cầu cứu hộ đang thực hiện, null nếu rảnh
+      // vehicles: danh sách tên phương tiện được gán cho đội này
     ],
 
     // Kho phương tiện — Coordinator điều phối gán cho các đội cứu hộ
@@ -158,6 +159,12 @@ function initState() {
   if (!saved.supplyOrders) saved.supplyOrders = def.supplyOrders
   if (!saved.nextId.vehicle)     saved.nextId.vehicle     = def.nextId.vehicle
   if (!saved.nextId.supplyOrder) saved.nextId.supplyOrder = def.nextId.supplyOrder
+  // Đảm bảo teams có trường vehicles
+  if (saved.teams) {
+    saved.teams.forEach(team => {
+      if (!team.vehicles) team.vehicles = []
+    })
+  }
   return saved
 }
 
@@ -311,10 +318,16 @@ export function addVehicle(vehicle) {
 // ─── Gán phương tiện cho đội cứu hộ (Coordinator) ───────────────────────────
 export function assignVehicle(vehicleId, teamId, teamName) {
   const vehicle = store.vehicles.find(v => v.id === vehicleId)
-  if (vehicle) {
+  const team = store.teams.find(t => t.id === teamId)
+  if (vehicle && team) {
     vehicle.status = 'assigned'
     vehicle.assignedTeamId = teamId
     vehicle.assignedTeamName = teamName
+    // Thêm tên phương tiện vào danh sách vehicles của đội
+    if (!team.vehicles) team.vehicles = []
+    if (!team.vehicles.includes(vehicle.name)) {
+      team.vehicles.push(vehicle.name)
+    }
     saveState()
   }
 }
@@ -323,6 +336,11 @@ export function assignVehicle(vehicleId, teamId, teamName) {
 export function unassignVehicle(vehicleId) {
   const vehicle = store.vehicles.find(v => v.id === vehicleId)
   if (vehicle) {
+    // Xóa tên phương tiện khỏi danh sách vehicles của đội
+    const team = store.teams.find(t => t.id === vehicle.assignedTeamId)
+    if (team && team.vehicles) {
+      team.vehicles = team.vehicles.filter(v => v !== vehicle.name)
+    }
     vehicle.status = 'available'
     vehicle.assignedTeamId = null
     vehicle.assignedTeamName = null
