@@ -5,13 +5,9 @@
 
     <div class="container py-4">
 
-      <!-- Header + nút thêm người dùng -->
-      <div class="d-flex justify-content-between align-items-center mb-4">
+      <!-- Header -->
+      <div class="mb-4">
         <h5 class="fw-semibold mb-0"><i class="bi bi-shield-lock text-primary me-2"></i>Quản Lý Người Dùng & Phân Quyền</h5>
-        <!-- Click mở modal thêm user mới -->
-        <button class="btn btn-primary btn-sm" @click="showAddUser = true">
-          <i class="bi bi-person-plus me-1"></i>Thêm người dùng
-        </button>
       </div>
 
       <!-- ═══ Thống kê số lượng user theo từng role ═══════════════════════════ -->
@@ -115,68 +111,6 @@
       </div>
 
       <!-- ══════════════════════════════════════════════════════════════════════════ -->
-      <!-- MODAL: THÊM NGƯỜI DÙNG MỚI                                              -->
-      <!-- @click.self: click vào nền overlay thì đóng modal                       -->
-      <!-- ══════════════════════════════════════════════════════════════════════════ -->
-      <div v-if="showAddUser" class="modal-overlay" @click.self="showAddUser = false">
-        <div class="card shadow-lg" style="width:440px">
-          <div class="card-header fw-semibold"><i class="bi bi-person-plus me-2"></i>Thêm Người Dùng Mới</div>
-          <div class="card-body">
-
-            <!-- Họ tên (bắt buộc) -->
-            <div class="mb-3">
-              <label class="form-label small">Họ tên <span class="text-danger">*</span></label>
-              <!-- v-model="addForm.name" — 2-way binding với reactive object addForm -->
-              <input v-model="addForm.name" class="form-control form-control-sm" placeholder="Họ và tên" />
-            </div>
-
-            <!-- Username và Password (cùng hàng) -->
-            <div class="row g-2 mb-3">
-              <div class="col">
-                <label class="form-label small">Tên đăng nhập <span class="text-danger">*</span></label>
-                <input v-model="addForm.username" class="form-control form-control-sm" placeholder="username" />
-              </div>
-              <div class="col">
-                <label class="form-label small">Mật khẩu <span class="text-danger">*</span></label>
-                <!-- type="password" ẩn ký tự khi nhập -->
-                <input v-model="addForm.password" type="password" class="form-control form-control-sm" placeholder="password" />
-              </div>
-            </div>
-
-            <!-- Role và SĐT (cùng hàng) -->
-            <div class="row g-2 mb-3">
-              <div class="col">
-                <label class="form-label small">Vai trò</label>
-                <!-- v-model="addForm.role" — mặc định là 'citizen' (set trong reactive) -->
-                <select v-model="addForm.role" class="form-select form-select-sm">
-                  <option value="citizen">Người dân</option>
-                  <option value="rescue_team">Đội cứu hộ</option>
-                  <option value="coordinator">Điều phối viên</option>
-                  <option value="manager">Quản lý</option>
-                  <option value="admin">Admin</option>
-                </select>
-              </div>
-              <div class="col">
-                <label class="form-label small">Số điện thoại</label>
-                <input v-model="addForm.phone" class="form-control form-control-sm" placeholder="SĐT" />
-              </div>
-            </div>
-
-            <!-- Thông báo lỗi từ validation -->
-            <!-- v-if: chỉ hiện khi addError có nội dung (truthy) -->
-            <div v-if="addError" class="alert alert-danger py-1 small">{{ addError }}</div>
-
-            <div class="d-flex gap-2">
-              <!-- doAddUser() kiểm tra validate trước khi gọi store -->
-              <button class="btn btn-primary btn-sm flex-fill" @click="doAddUser">Thêm</button>
-              <!-- Đóng modal mà không lưu gì -->
-              <button class="btn btn-secondary btn-sm" @click="showAddUser = false">Hủy</button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- ══════════════════════════════════════════════════════════════════════════ -->
       <!-- MODAL: CHỈNH SỬA NGƯỜI DÙNG                                             -->
       <!-- ══════════════════════════════════════════════════════════════════════════ -->
       <div v-if="showEditUser" class="modal-overlay" @click.self="showEditUser = false">
@@ -230,7 +164,7 @@ import { ref, computed, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import NavBar from '../components/NavBar.vue'
 // Nhập store (đọc dữ liệu) và các hàm CRUD từ module store trung tâm
-import { store, logout, addUser, updateUser } from '../store/index.js'
+import { store, logout, updateUser } from '../store/index.js'
 
 const router = useRouter()
 
@@ -238,15 +172,8 @@ const router = useRouter()
 const filterRole = ref('') // Role đang lọc — rỗng = hiện tất cả
 const search     = ref('') // Text tìm kiếm
 
-// Cờ hiển thị modal — ref(false) = modal ẩn ban đầu
-const showAddUser  = ref(false)
+// Cờ hiển thị modal
 const showEditUser = ref(false)
-
-// Thông báo lỗi trong modal thêm user — rỗng = không có lỗi
-const addError = ref('')
-
-// Form thêm user mới — reactive() để truy cập addForm.name không cần .value
-const addForm  = reactive({ name: '', username: '', password: '', role: 'citizen', phone: '' })
 
 // Form sửa user (được pre-filled từ startEdit())
 // id: null ban đầu, sẽ được gán khi chọn user để sửa
@@ -305,31 +232,6 @@ const roleIcon  = r => roleInfo[r]?.icon   || 'bi bi-person' // Icon class
 function startEdit(user) {
   Object.assign(editForm, { id: user.id, name: user.name, role: user.role, phone: user.phone })
   showEditUser.value = true // Hiện modal
-}
-
-// Thêm user mới với đầy đủ validation
-function doAddUser() {
-  addError.value = '' // Xóa lỗi cũ trước khi validate
-
-  // Validation 1: các trường bắt buộc phải có giá trị (truthy)
-  if (!addForm.name || !addForm.username || !addForm.password) {
-    addError.value = 'Vui lòng điền đầy đủ thông tin bắt buộc!'
-    return // Dừng hàm, không thêm user
-  }
-
-  // Validation 2: username không được trùng (so sánh case-sensitive)
-  // LƯU Ý: 'Admin' và 'admin' sẽ được coi là 2 username khác nhau — có thể gây nhầm lẫn
-  if (store.users.find(u => u.username === addForm.username)) {
-    addError.value = 'Tên đăng nhập đã tồn tại!'
-    return
-  }
-
-  // Gọi store để thêm user — active: true được set tự động trong addUser()
-  addUser({ name: addForm.name, username: addForm.username, password: addForm.password, role: addForm.role, phone: addForm.phone })
-
-  // Reset form về giá trị mặc định
-  Object.assign(addForm, { name: '', username: '', password: '', role: 'citizen', phone: '' })
-  showAddUser.value = false // Đóng modal
 }
 
 // Lưu thay đổi thông tin user
