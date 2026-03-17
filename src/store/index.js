@@ -118,15 +118,24 @@ function defaultState() {
       // vehicles: danh sách tên phương tiện được gán cho đội này
     ],
 
+    // Danh sách loại phương tiện
+    vehicleTypes: [
+      { id: 1, name: 'Xuồng máy',  description: 'Phương tiện di chuyển trên nước, tốc độ cao' },
+      { id: 2, name: 'Xe tải',     description: 'Phương tiện vận chuyển hàng hóa số lượng lớn' },
+      { id: 3, name: 'Trực thăng', description: 'Phương tiện bay, di chuyển nhanh, vùng khó tiếp cận' },
+      { id: 4, name: 'Thuyền',     description: 'Phương tiện di chuyển trên nước, tải trọng lớn' },
+    ],
+
     // Kho phương tiện — Coordinator điều phối gán cho các đội cứu hộ
     vehicles: [
-      { id: 1, name: 'Xuồng máy 01', type: 'Xuồng máy',  status: 'assigned',  assignedTeamId: 3, assignedTeamName: 'Đội Cứu Hộ A' },
-      { id: 2, name: 'Xe tải 01',    type: 'Xe tải',     status: 'assigned',  assignedTeamId: 3, assignedTeamName: 'Đội Cứu Hộ A' },
-      { id: 3, name: 'Xuồng máy 02', type: 'Xuồng máy',  status: 'assigned',  assignedTeamId: 4, assignedTeamName: 'Đội Cứu Hộ B' },
-      { id: 4, name: 'Xuồng máy 03', type: 'Xuồng máy',  status: 'available', assignedTeamId: null, assignedTeamName: null },
-      { id: 5, name: 'Xe tải 02',    type: 'Xe tải',     status: 'available', assignedTeamId: null, assignedTeamName: null },
-      { id: 6, name: 'Trực thăng 01',type: 'Trực thăng', status: 'available', assignedTeamId: null, assignedTeamName: null },
+      { id: 1, name: 'Xuồng máy 01', vehicleTypeId: 1,  status: 'assigned',  assignedTeamId: 3, assignedTeamName: 'Đội Cứu Hộ A' },
+      { id: 2, name: 'Xe tải 01',    vehicleTypeId: 2,  status: 'assigned',  assignedTeamId: 3, assignedTeamName: 'Đội Cứu Hộ A' },
+      { id: 3, name: 'Xuồng máy 02', vehicleTypeId: 1,  status: 'assigned',  assignedTeamId: 4, assignedTeamName: 'Đội Cứu Hộ B' },
+      { id: 4, name: 'Xuồng máy 03', vehicleTypeId: 1,  status: 'available', assignedTeamId: null, assignedTeamName: null },
+      { id: 5, name: 'Xe tải 02',    vehicleTypeId: 2,  status: 'available', assignedTeamId: null, assignedTeamName: null },
+      { id: 6, name: 'Trực thăng 01',vehicleTypeId: 3,  status: 'available', assignedTeamId: null, assignedTeamName: null },
       // status: 'available' = sẵn sàng | 'assigned' = đang gán cho đội
+      // vehicleTypeId: tham chiếu đến vehicleTypes[].id
     ],
 
     // Phiếu phân phối hàng cứu trợ cho đội — do Coordinator thực hiện
@@ -145,6 +154,7 @@ function defaultState() {
       distribution: 4, // ID tiếp theo khi ghi nhận phân phối (Manager)
       vehicle:      7, // ID tiếp theo khi thêm phương tiện mới
       supplyOrder:  4, // ID tiếp theo khi Coordinator tạo phiếu phân phối
+      vehicleType:  5, // ID tiếp theo khi thêm loại phương tiện mới
     }
   }
 }
@@ -153,16 +163,27 @@ function defaultState() {
 function initState() {
   const saved = loadState()
   if (!saved) return defaultState()
-  // Đảm bảo các trường mới (vehicles, supplyOrders) tồn tại nếu dữ liệu cũ chưa có
+  // Đảm bảo các trường mới (vehicles, supplyOrders, vehicleTypes) tồn tại nếu dữ liệu cũ chưa có
   const def = defaultState()
-  if (!saved.vehicles)     saved.vehicles     = def.vehicles
-  if (!saved.supplyOrders) saved.supplyOrders = def.supplyOrders
-  if (!saved.nextId.vehicle)     saved.nextId.vehicle     = def.nextId.vehicle
-  if (!saved.nextId.supplyOrder) saved.nextId.supplyOrder = def.nextId.supplyOrder
+  if (!saved.vehicles)      saved.vehicles      = def.vehicles
+  if (!saved.supplyOrders)  saved.supplyOrders  = def.supplyOrders
+  if (!saved.vehicleTypes)  saved.vehicleTypes  = def.vehicleTypes
+  if (!saved.nextId.vehicle)      saved.nextId.vehicle      = def.nextId.vehicle
+  if (!saved.nextId.supplyOrder)  saved.nextId.supplyOrder  = def.nextId.supplyOrder
+  if (!saved.nextId.vehicleType)  saved.nextId.vehicleType  = def.nextId.vehicleType
   // Đảm bảo teams có trường vehicles
   if (saved.teams) {
     saved.teams.forEach(team => {
       if (!team.vehicles) team.vehicles = []
+    })
+  }
+  // Migrate vehicles cũ sang vehicleTypeId nếu chưa có
+  if (saved.vehicles) {
+    saved.vehicles.forEach(vehicle => {
+      if (!vehicle.vehicleTypeId && vehicle.type) {
+        const vType = saved.vehicleTypes?.find(vt => vt.name === vehicle.type)
+        if (vType) vehicle.vehicleTypeId = vType.id
+      }
     })
   }
   return saved
@@ -245,6 +266,16 @@ export function updateRequestStatus(id, status, notes, teamId, teamName) {
   }
 }
 
+// ─── Lưu dữ liệu backend vào request (backendAssignmentId sau khi assign) ─────
+// Dùng để gọi completeMission API cần assignmentId từ backend
+export function setRequestBackendData(requestId, data) {
+  const req = store.rescueRequests.find(r => r.id === requestId)
+  if (req) {
+    Object.assign(req, data)
+    saveState()
+  }
+}
+
 // ─── Người dân xác nhận đã được cứu hộ ─────────────────────────────────────
 export function confirmRescue(requestId) {
   const req = store.rescueRequests.find(r => r.id === requestId)
@@ -307,8 +338,37 @@ export function updateUser(id, updates) {
   }
 }
 
+// ─── Thêm loại phương tiện mới ──────────────────────────────────────────────
+// vehicleType: { name, description }
+export function addVehicleType(vehicleType) {
+  const id = store.nextId.vehicleType++
+  store.vehicleTypes.push({ ...vehicleType, id })
+  saveState()
+}
+
+// ─── Cập nhật loại phương tiện ──────────────────────────────────────────────
+export function updateVehicleType(id, updates) {
+  const vType = store.vehicleTypes.find(vt => vt.id === id)
+  if (vType) {
+    Object.assign(vType, updates)
+    saveState()
+  }
+}
+
+// ─── Xóa loại phương tiện ───────────────────────────────────────────────────
+export function deleteVehicleType(id) {
+  // Kiểm tra xem có phương tiện nào đang dùng loại này không
+  const hasVehicles = store.vehicles.some(v => v.vehicleTypeId === id)
+  if (hasVehicles) {
+    return { success: false, message: 'Không thể xóa loại xe đang được sử dụng!' }
+  }
+  store.vehicleTypes = store.vehicleTypes.filter(vt => vt.id !== id)
+  saveState()
+  return { success: true }
+}
+
 // ─── Thêm phương tiện mới vào kho ───────────────────────────────────────────
-// vehicle: { name, type }
+// vehicle: { name, vehicleTypeId }
 export function addVehicle(vehicle) {
   const id = store.nextId.vehicle++
   store.vehicles.push({ ...vehicle, id, status: 'available', assignedTeamId: null, assignedTeamName: null })

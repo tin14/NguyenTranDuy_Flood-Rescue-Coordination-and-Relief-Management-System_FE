@@ -230,14 +230,12 @@ function handleLogin() {
   // Xác nhận vai trò đã chọn khớp với vai trò thực của tài khoản
   if (user.role !== loginRole.value) {
     error.value = `Tài khoản này không thuộc vai trò đã chọn. Vai trò thực: ${roleOptions.find(r => r.value === user.role)?.label || user.role}`
-    // Đăng xuất ngay vì login() đã lưu user
     store.currentUser = null
     return
   }
 
   router.push(roleRoutes[user.role] || '/login')
 }
-
 // ─── Đăng ký ─────────────────────────────────────────────────────────────────
 const regForm = reactive({
   name: '', username: '', password: '', phone: '', role: 'citizen',

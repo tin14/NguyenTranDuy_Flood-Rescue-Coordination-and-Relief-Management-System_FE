@@ -16,6 +16,11 @@
             <i class="bi bi-truck me-1"></i>Quản Lý Phương Tiện
           </button>
         </li>
+        <li class="nav-item">
+          <button class="nav-link" :class="{ active: activeTab === 'vehicleTypes' }" @click="activeTab = 'vehicleTypes'">
+            <i class="bi bi-tags me-1"></i>Loại Phương Tiện
+          </button>
+        </li>
       </ul>
 
       <!-- ═══ TAB 1: YÊU CẦU CỨU HỘ ═══════════════════════════════════════════ -->
@@ -184,7 +189,7 @@
                     <option value="">-- Chọn đội cứu hộ --</option>
                     <!-- Liệt kê tất cả đội, hiển thị trạng thái và phương tiện -->
                     <option v-for="team in store.teams" :key="team.id" :value="team.id">
-                      {{ team.name }} ({{ team.status === 'available' ? '✅ Sẵn sàng' : '🔄 Đang bận' }}) - {{ team.vehicles.join(', ') }}
+                      {{ team.name }} ({{ team.status === 'available' ? '✅ Sẵn sàng' : '🔄 Đang bận' }}){{ team.vehicles?.length ? ' — ' + team.vehicles.join(', ') : '' }}
                     </option>
                   </select>
                   <!-- :disabled="!actionForm.teamId" — vô hiệu nút nếu chưa chọn đội -->
@@ -261,7 +266,7 @@
                   <tr v-for="vehicle in store.vehicles" :key="vehicle.id">
                     <td>{{ vehicle.id }}</td>
                     <td class="fw-semibold">{{ vehicle.name }}</td>
-                    <td>{{ vehicle.type }}</td>
+                    <td>{{ getVehicleTypeName(vehicle.vehicleTypeId) }}</td>
                     <td>
                       <span class="badge" :class="vehicle.status === 'available' ? 'bg-success' : 'bg-warning text-dark'">
                         {{ vehicle.status === 'available' ? '✅ Sẵn sàng' : '🔄 Đã gán' }}
@@ -287,6 +292,81 @@
         </div>
       </div><!-- End Tab Vehicles -->
 
+      <!-- ═══ TAB 3: QUẢN LÝ LOẠI PHƯƠNG TIỆN ══════════════════════════════════ -->
+      <div v-if="activeTab === 'vehicleTypes'">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <h5 class="fw-semibold mb-0"><i class="bi bi-tags text-primary me-2"></i>Quản Lý Loại Phương Tiện</h5>
+          <button class="btn btn-primary btn-sm" @click="showAddVehicleType = true">
+            <i class="bi bi-plus-circle me-1"></i>Thêm loại xe
+          </button>
+        </div>
+
+        <!-- Grid các thẻ loại xe -->
+        <div class="row g-3">
+          <div v-for="vType in store.vehicleTypes" :key="vType.id" class="col-md-4">
+            <div class="card border-0 shadow-sm">
+              <div class="card-body">
+                <div class="d-flex justify-content-between align-items-start mb-2">
+                  <h6 class="fw-semibold mb-0">{{ vType.name }}</h6>
+                  <span class="badge bg-info text-dark">{{ vehicleCountByType(vType.id) }} xe</span>
+                </div>
+                <p class="text-muted small mb-3">{{ vType.description }}</p>
+                <div class="d-flex gap-2">
+                  <button class="btn btn-outline-primary btn-sm flex-fill" @click="selectEditVehicleType(vType)">
+                    <i class="bi bi-pencil me-1"></i>Sửa
+                  </button>
+                  <button class="btn btn-outline-danger btn-sm" @click="doDeleteVehicleType(vType.id)">
+                    <i class="bi bi-trash me-1"></i>Xóa
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div><!-- End Tab VehicleTypes -->
+
+      <!-- ═══ MODAL: THÊM LOẠI PHƯƠNG TIỆN ═════════════════════════════════════ -->
+      <div v-if="showAddVehicleType" class="modal-overlay" @click.self="showAddVehicleType = false">
+        <div class="card shadow-lg" style="width:420px">
+          <div class="card-header fw-semibold">Thêm Loại Phương Tiện Mới</div>
+          <div class="card-body">
+            <div class="mb-3">
+              <label class="form-label small">Tên loại xe</label>
+              <input v-model="vehicleTypeForm.name" class="form-control form-control-sm" placeholder="VD: Xuồng cao tốc" />
+            </div>
+            <div class="mb-3">
+              <label class="form-label small">Mô tả</label>
+              <textarea v-model="vehicleTypeForm.description" class="form-control form-control-sm" rows="3" placeholder="Mô tả đặc điểm, công dụng..."></textarea>
+            </div>
+            <div class="d-flex gap-2">
+              <button class="btn btn-primary btn-sm flex-fill" @click="doAddVehicleType">Thêm</button>
+              <button class="btn btn-secondary btn-sm" @click="showAddVehicleType = false">Hủy</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ MODAL: SỬA LOẠI PHƯƠNG TIỆN ══════════════════════════════════════ -->
+      <div v-if="showEditVehicleType" class="modal-overlay" @click.self="showEditVehicleType = false">
+        <div class="card shadow-lg" style="width:420px">
+          <div class="card-header fw-semibold">Sửa Loại Phương Tiện</div>
+          <div class="card-body">
+            <div class="mb-3">
+              <label class="form-label small">Tên loại xe</label>
+              <input v-model="editVehicleTypeForm.name" class="form-control form-control-sm" />
+            </div>
+            <div class="mb-3">
+              <label class="form-label small">Mô tả</label>
+              <textarea v-model="editVehicleTypeForm.description" class="form-control form-control-sm" rows="3"></textarea>
+            </div>
+            <div class="d-flex gap-2">
+              <button class="btn btn-primary btn-sm flex-fill" @click="doEditVehicleType">Lưu</button>
+              <button class="btn btn-secondary btn-sm" @click="showEditVehicleType = false">Hủy</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- ═══ MODAL: THÊM PHƯƠNG TIỆN ═══════════════════════════════════════════ -->
       <div v-if="showAddVehicle" class="modal-overlay" @click.self="showAddVehicle = false">
         <div class="card shadow-lg" style="width:420px">
@@ -298,11 +378,11 @@
             </div>
             <div class="mb-3">
               <label class="form-label small">Loại phương tiện</label>
-              <select v-model="vehicleForm.type" class="form-select form-select-sm">
-                <option value="Xuồng máy">Xuồng máy</option>
-                <option value="Xe tải">Xe tải</option>
-                <option value="Trực thăng">Trực thăng</option>
-                <option value="Thuyền">Thuyền</option>
+              <select v-model.number="vehicleForm.vehicleTypeId" class="form-select form-select-sm">
+                <option value="">-- Chọn loại xe --</option>
+                <option v-for="vType in store.vehicleTypes" :key="vType.id" :value="vType.id">
+                  {{ vType.name }}
+                </option>
               </select>
             </div>
             <div class="d-flex gap-2">
@@ -345,7 +425,8 @@ import { ref, computed, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import NavBar from '../components/NavBar.vue'
 import StatusBadge from '../components/StatusBadge.vue'
-import { store, logout, updateRequestStatus, addSupplyOrder, addVehicle, assignVehicle, unassignVehicle } from '../store/index.js'
+import { store, logout, updateRequestStatus, addSupplyOrder, addVehicle, assignVehicle, unassignVehicle, setRequestBackendData, addVehicleType, updateVehicleType, deleteVehicleType } from '../store/index.js'
+import { verifyRequestAPI, assignTeamAPI } from '../services/rescueApi.js'
 
 const router = useRouter()
 
@@ -374,12 +455,20 @@ const distError = ref('')
 const showAddVehicle = ref(false)
 const showAssignVehicle = ref(false)
 const selectedVehicle = ref(null)
+const showAddVehicleType = ref(false)
+const showEditVehicleType = ref(false)
 
 // Form thêm phương tiện
-const vehicleForm = reactive({ name: '', type: 'Xuồng máy' })
+const vehicleForm = reactive({ name: '', vehicleTypeId: '' })
 
 // Form gán phương tiện cho đội
 const assignVehicleForm = reactive({ teamId: '' })
+
+// Form thêm loại phương tiện
+const vehicleTypeForm = reactive({ name: '', description: '' })
+
+// Form sửa loại phương tiện
+const editVehicleTypeForm = reactive({ id: null, name: '', description: '' })
 
 // Danh sách phương tiện của đội được phân công cho yêu cầu đang chọn
 const assignedTeamVehicles = computed(() => {
@@ -423,21 +512,47 @@ function selectRequest(req) {
 }
 
 // Xác minh yêu cầu: cập nhật status → 'verified' và lưu ghi chú
-function verifyRequest() {
+async function verifyRequest() {
   const req = selectedRequest.value
   req.urgency = actionForm.urgency  // Cập nhật urgency trong store TRƯỚC khi saveState() được gọi
   updateRequestStatus(req.id, 'verified', actionForm.notes) // Lưu status + notes + urgency vào localStorage
   selectedRequest.value = store.rescueRequests.find(r => r.id === req.id)
+
+  // Gọi Backend API (best-effort: nếu lỗi thì chỉ log, không block UI)
+  try {
+    await verifyRequestAPI(req.id, req.urgency)
+    console.log(`[API] Đã xác minh yêu cầu #${req.id} trên backend`)
+  } catch (err) {
+    console.warn(`[API] Không thể xác minh trên backend (request #${req.id}):`, err.message || err)
+  }
 }
 
 // Phân công đội cứu hộ cho yêu cầu được chọn
-function assignTeam() {
+async function assignTeam() {
   // Number() chuyển teamId từ string sang số để khớp với team.id (kiểu number)
   const team = store.teams.find(t => t.id === Number(actionForm.teamId))
   if (team) {
     // Cập nhật: status → 'assigned', ghi chú, teamId, teamName
     updateRequestStatus(selectedRequest.value.id, 'assigned', actionForm.notes, team.id, team.name)
     selectedRequest.value = store.rescueRequests.find(r => r.id === selectedRequest.value.id)
+
+    // Gọi Backend API (best-effort)
+    // Lấy phương tiện đầu tiên được gán cho đội này từ kho phương tiện
+    const teamVehicle = store.vehicles.find(v => v.assignedTeamId === team.id)
+    if (teamVehicle) {
+      try {
+        const res = await assignTeamAPI(selectedRequest.value.id, team.id, teamVehicle.id)
+        // Lưu assignment ID từ backend để dùng khi hoàn thành nhiệm vụ
+        if (res?.data?.id) {
+          setRequestBackendData(selectedRequest.value.id, { backendAssignmentId: res.data.id })
+        }
+        console.log(`[API] Đã phân công đội #${team.id} + phương tiện #${teamVehicle.id} trên backend`)
+      } catch (err) {
+        console.warn(`[API] Không thể phân công trên backend:`, err.message || err)
+      }
+    } else {
+      console.warn(`[API] Đội ${team.name} chưa được gán phương tiện — bỏ qua API assignTeam`)
+    }
   }
 }
 
@@ -483,10 +598,19 @@ function formatDate(dt) {
 }
 
 // ─── Vehicle Management Functions ───────────────────────────────────────────
+function getVehicleTypeName(vehicleTypeId) {
+  const vType = store.vehicleTypes.find(vt => vt.id === vehicleTypeId)
+  return vType?.name || '—'
+}
+
+function vehicleCountByType(vehicleTypeId) {
+  return store.vehicles.filter(v => v.vehicleTypeId === vehicleTypeId).length
+}
+
 function doAddVehicle() {
-  if (!vehicleForm.name) return
-  addVehicle({ name: vehicleForm.name, type: vehicleForm.type })
-  Object.assign(vehicleForm, { name: '', type: 'Xuồng máy' })
+  if (!vehicleForm.name || !vehicleForm.vehicleTypeId) return
+  addVehicle({ name: vehicleForm.name, vehicleTypeId: vehicleForm.vehicleTypeId })
+  Object.assign(vehicleForm, { name: '', vehicleTypeId: '' })
   showAddVehicle.value = false
 }
 
@@ -508,6 +632,32 @@ function doAssignVehicle() {
 
 function doUnassignVehicle(vehicleId) {
   unassignVehicle(vehicleId)
+}
+
+// ─── Vehicle Type Management Functions ──────────────────────────────────────
+function doAddVehicleType() {
+  if (!vehicleTypeForm.name) return
+  addVehicleType({ name: vehicleTypeForm.name, description: vehicleTypeForm.description })
+  Object.assign(vehicleTypeForm, { name: '', description: '' })
+  showAddVehicleType.value = false
+}
+
+function selectEditVehicleType(vType) {
+  Object.assign(editVehicleTypeForm, { id: vType.id, name: vType.name, description: vType.description })
+  showEditVehicleType.value = true
+}
+
+function doEditVehicleType() {
+  updateVehicleType(editVehicleTypeForm.id, { name: editVehicleTypeForm.name, description: editVehicleTypeForm.description })
+  showEditVehicleType.value = false
+}
+
+function doDeleteVehicleType(id) {
+  if (!confirm('Bạn có chắc muốn xóa loại xe này?')) return
+  const result = deleteVehicleType(id)
+  if (!result.success) {
+    alert(result.message)
+  }
 }
 
 </script>

@@ -216,6 +216,7 @@ import { useRouter } from 'vue-router'
 import NavBar from '../components/NavBar.vue'
 import StatusBadge from '../components/StatusBadge.vue'
 import { store, logout, updateRequestStatus } from '../store/index.js'
+import { completeMissionAPI } from '../services/rescueApi.js'
 
 const router = useRouter()
 
@@ -265,13 +266,24 @@ function updateStatus(status) {
 }
 
 // Hoàn thành nhiệm vụ với ghi chú kết quả
-function completeTask() {
-  updateRequestStatus(selectedTask.value.id, 'completed', completeNote.value)
-  // Làm mới selectedTask
-  selectedTask.value = store.rescueRequests.find(r => r.id === selectedTask.value.id)
-  // Ẩn form và reset ghi chú
+async function completeTask() {
+  const task = selectedTask.value
+  updateRequestStatus(task.id, 'completed', completeNote.value)
+  selectedTask.value = store.rescueRequests.find(r => r.id === task.id)
   showCompleteForm.value = false
   completeNote.value = ''
+
+  // Gọi Backend API (best-effort: nếu lỗi chỉ log, không block UI)
+  if (task.backendAssignmentId) {
+    try {
+      await completeMissionAPI(task.backendAssignmentId)
+      console.log(`[API] Đã hoàn thành nhiệm vụ (assignment #${task.backendAssignmentId}) trên backend`)
+    } catch (err) {
+      console.warn(`[API] Không thể cập nhật hoàn thành trên backend:`, err.message || err)
+    }
+  } else {
+    console.info('[API] Bỏ qua completeMission — chưa có backendAssignmentId (phân công chưa qua API)')
+  }
 }
 
 function handleLogout() {
